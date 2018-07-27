@@ -246,6 +246,55 @@ class PerfectPlayer(Player):
     pass
 
 
+class HumanPlayer(Player):
+  def __init__(self):
+    self._name = input('What is your name? ')
+
+  @property
+  def name(self):
+    return self._name
+
+  def start(self, board, player):
+    self.board = board
+    self.me = player
+    print('{}! You are {}.'.format(self.name, _NAMES[player]))
+
+  def play(self):
+    valid_moves = self.board.valid_moves
+    while True:
+      print('{}!\n{}'.format(self.name, self.board))
+      print('Valid moves are {}'.format(valid_moves))
+      move = int(input('Your move: '))
+      if move in valid_moves:
+        return move
+      else:
+        print('ERROR: Invalid move!')
+
+  def end(self):
+    winner = self.board.winner
+    if winner == self.me:
+      print("{}! You've won the game!".format(self.name))
+    elif winner:
+      print("{}! You've lost the game!".format(self.name))
+    else:
+      print("{}! Tied game.".format(self.name))
+
+
+class QLearningPlayer(Player):
+  def __init__(self):
+    pass
+
+  def start(self, board, player):
+    self.board = board
+    self.me = player
+
+  def play(self):
+    return random.choice(self._best_moves[Game(self.board, self.me)])
+
+  def end(self):
+    pass
+
+
 def empty_stats():
   return {X: 0, O: 0, None: 0}
 
@@ -258,7 +307,7 @@ def main():
   print('Done in {} seconds'.format(end_time - start_time), flush=True)
 
   player_o = PerfectPlayer(best_moves)
-  player_x = RandomPlayer()
+  player_x = HumanPlayer()
 
   stats = empty_stats()
   for i in range(100):
