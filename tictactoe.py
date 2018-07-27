@@ -280,6 +280,7 @@ class HumanPlayer(Player):
       print("{}! Tied game.".format(self.name))
 
 
+# TODO(pikalaw): Finish this.
 class QLearningPlayer(Player):
   def __init__(self):
     pass
@@ -289,7 +290,7 @@ class QLearningPlayer(Player):
     self.me = player
 
   def play(self):
-    return random.choice(self._best_moves[Game(self.board, self.me)])
+    pass
 
   def end(self):
     pass
