@@ -17,33 +17,47 @@ class Board(object):
       self._board = board
     else:
       self._board = [EMPTY]*9
+    self._winner = None
+    self._is_tied = False
 
   def __repr__(self):
     return 'Board({})'.format(self._board)
 
   @property
   def winner(self):
+    if self._winner:
+      return self._winner
+
     for row in range(3):
       if (self._board[row*3] != EMPTY and
           self._board[row*3] == self._board[row*3+1] == self._board[row*3+2]):
-        return self._board[row*3]
+        self._winner = self._board[row*3]
+        return self._winner
+
     for col in range(3):
       if (self._board[col] != EMPTY and
           self._board[col] == self._board[3+col] == self._board[6+col]):
-        return self._board[col]
+        self._winner =  self._board[col]
+        return self._winner
+
     if (self._board[4] != EMPTY and
         self._board[0] == self._board[4] == self._board[8]):
-      return self._board[4]
+      self._winner =  self._board[4]
+      return self._winner
+
     if (self._board[4] != EMPTY and
         self._board[2] == self._board[4] == self._board[6]):
-      return self._board[4]
+      self._winner =  self._board[4]
+      return self._winner
+
     return None
 
   @property
   def is_tied(self):
-    return (
-        (not self.winner) and
-        sum(1 for cell in self._board if cell in [X, O]) == 9)
+    if not self._is_tied:
+      self._is_tied = ((not self.winner) and
+          sum(1 for cell in self._board if cell in [X, O]) == 9)
+    return self._is_tied
 
   @property
   def is_valid(self):
