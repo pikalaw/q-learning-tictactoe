@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from copy import deepcopy
 import random
 import time
@@ -280,20 +281,70 @@ class HumanPlayer(Player):
       print("{}! Tied game.".format(self.name))
 
 
+def q_matrix(data_factory):
+  # (state, action) -> data
+  return defaultdict(defaultdict(data_factory))
+
+
+def empty_q_score():
+  return q_matrix(float)
+
+
+def empty_observed_state_transition():
+  return q_matrix(set)
+
+
 # TODO(pikalaw): Finish this.
 class QLearningPlayer(Player):
-  def __init__(self):
-    pass
+  def __init__(self, q_score, observed_state_transition, learning_rate=1.0,
+      discount_factor=1.0, e_greedy=0.0):
+    self.q_score = q_score
+    self.observed_state_transition = observed_state_transition
+    self.learning_rate = learning_rate
+    self.discount_factor = discount_factor
+    self.e_greedy = e_greedy
 
   def start(self, board, player):
     self.board = board
     self.me = player
+    self._frames = []
 
   def play(self):
-    pass
+    current_state = self._current_game_state
+    current_moves = self.board.valid_moves
+    selected_move = self._compute_best_move(current_state, current_moves)
+    self._frames.append(current_state, selected_move)
+    return selected_move
 
   def end(self):
-    pass
+    next_state = self._current_game_state
+    for state, move in reversed(self._frames):
+      self._update_observed_state_transition(state, move, next_state)
+      self._update_q_score(state, move)
+      next_state = state
+
+  @property
+  def _current_game_state(self):
+    return (repr(self.board), self.me)
+
+  def _compute_best_move(self, state, valid_moves):
+    if random.random() < self.e_greedy:
+      return random.choice(valid_moves)
+    else:
+      q_scores = self.q_score[state]
+      # Make sure all moves are initialized.
+      for move in valid_moves:
+        q_scores[move]
+      return max(q_scores, key=lambda move: q_scores[move])
+
+  def _update_observed_state_transition(self, state, move, next_state):
+    self.observed_state_transition[state][move].add(next_state)
+
+  def _update_q_score(self, state, move):
+    self.q_score[state][move] = (
+        (1 - self.learning_rate) * self.q_score[state][move] +
+        self.learning_rate * (self._tictactoe_reward(state, move) +
+            self.discount_factor * self._expected_future_q_score(state, move)))
 
 
 def empty_stats():
