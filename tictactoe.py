@@ -325,8 +325,17 @@ class QLearningPlayer(Player):
 
   @property
   def _current_game_state(self):
-    return (repr(self.board), self.me)
+    return QLearningPlayer._pack_game_state(self.board, self.me)
 
+  @staticmethod
+  def _pack_game_state(board, player):
+    return repr(board), player
+      
+  @staticmethod
+  def _unpack_game_state(state):
+    board_repr, player = state
+    return eval(board_repr), player
+      
   def _compute_best_move(self, state, valid_moves):
     if random.random() < self.e_greedy:
       return random.choice(valid_moves)
