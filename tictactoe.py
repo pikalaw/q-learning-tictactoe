@@ -313,7 +313,7 @@ class QLearningPlayer(Player):
     current_state = self._current_game_state
     current_moves = self.board.valid_moves
     selected_move = self._compute_best_move(current_state, current_moves)
-    self._frames.append(current_state, selected_move)
+    self._frames.append((current_state, selected_move))
     return selected_move
 
   def end(self):
