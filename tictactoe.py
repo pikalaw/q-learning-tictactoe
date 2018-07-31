@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from contextlib import contextmanager
 from copy import deepcopy
 import random
 import time
@@ -190,7 +191,7 @@ class Player(ABC):
     pass
 
 
-def match(player_x, player_o, stats):
+def match(player_x, player_o, stats, output=True):
   board = Board()
 
   players = {X: player_x, O: player_o}
@@ -202,18 +203,22 @@ def match(player_x, player_o, stats):
   while True:
     winner = board.winner
     if winner:
-      print('Game won by {}.'.format(_NAMES[winner]), flush=True)
+      if output:
+        print('Game won by {}.'.format(_NAMES[winner]), flush=True)
       stats[winner] += 1
       break
     if board.is_tied:
-      print('Game is tied.', flush=True)
+      if output:
+        print('Game is tied.', flush=True)
       stats[None] += 1
       break
 
     move = players[next_to_play].play()
-    print('Player {} plays {}'.format(_NAMES[next_to_play], move))
+    if output:
+      print('Player {} plays {}'.format(_NAMES[next_to_play], move))
     board.play(next_to_play, move)
-    print(board)
+    if output:
+      print(board)
     next_to_play = _opponent(next_to_play)
      
   for player in players.values():
@@ -281,20 +286,17 @@ class HumanPlayer(Player):
       print("{}! Tied game.".format(self.name))
 
 
-def q_matrix(data_factory):
-  # (state, action) -> data
-  return defaultdict(defaultdict(data_factory))
-
-
 def empty_q_score():
-  return q_matrix(float)
+  # (state, action) -> expected total reward.
+  return defaultdict(lambda: defaultdict(float))
 
 
 def empty_observed_state_transition():
-  return q_matrix(set)
+  # (state, action, next_state) -> number of times 'state' with 'action'
+  # resulted in next_state.
+  return defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
 
 
-# TODO(pikalaw): Finish this.
 class QLearningPlayer(Player):
   def __init__(self, q_score, observed_state_transition, learning_rate=1.0,
       discount_factor=1.0, e_greedy=0.0):
@@ -347,33 +349,104 @@ class QLearningPlayer(Player):
       return max(q_scores, key=lambda move: q_scores[move])
 
   def _update_observed_state_transition(self, state, move, next_state):
-    self.observed_state_transition[state][move].add(next_state)
+    self.observed_state_transition[state][move][next_state] += 1
 
   def _update_q_score(self, state, move):
+    if self.learning_rate == 0:
+      # Won't learn. So, just skip the rest of the computation.
+      return
     self.q_score[state][move] = (
         (1 - self.learning_rate) * self.q_score[state][move] +
-        self.learning_rate * (self._tictactoe_reward(state, move) +
-            self.discount_factor * self._expected_future_q_score(state, move)))
+        self.learning_rate * self._compute_new_q_score(state, move))
+
+  def _compute_new_q_score(self, state, move):
+    observed_next_states = self.observed_state_transition[state][move]
+    assert len(observed_next_states) > 0
+
+    new_q_score = 0
+
+    total = sum(observed_next_states.values())
+    for potential_next_state, count in observed_next_states.items():
+      new_q_score += (
+        count / total * (
+          QLearningPlayer._reward(potential_next_state) +
+          max(self.q_score[potential_next_state].values(), default=0)
+        )
+      )
+
+    return new_q_score
+
+  @staticmethod
+  def _reward(state):
+    board, player = QLearningPlayer._unpack_game_state(state)
+    winner = board.winner
+    if winner == player:
+      return 100
+    if winner:
+      return -100
+    if board.is_tied:
+      return 50
+    return -1
+
+ 
+# Returns q_score, observed_state_transition.
+def train_q_learner(against_player, as_x_or_o):
+  q_score = empty_q_score()
+  observed_state_transition = empty_observed_state_transition()
+
+  training_q_learner = QLearningPlayer(q_score, observed_state_transition,
+      learning_rate=1, discount_factor=1, e_greedy=1)
+
+  players = {
+    as_x_or_o: against_player,
+    _opponent(as_x_or_o): training_q_learner
+  }
+
+  num_episodes = 1000
+  stats = empty_stats()
+  for i in range(num_episodes):
+    match(players[X], players[O], stats, output=False)
+    # Linear decay of e-greedy.
+    training_q_learner.e_greedy = (num_episodes - i) / num_episodes
+  print(stats)
+
+  return q_score, observed_state_transition
+  
+
+def build_q_learned_player(q_score, observed_state_transition):
+  return QLearningPlayer(q_score, observed_state_transition,
+      learning_rate=0, discount_factor=1, e_greedy=0)
 
 
 def empty_stats():
   return {X: 0, O: 0, None: 0}
 
 
-def main():
-  print('Computing best moves...', end=' ', flush=True)
+@contextmanager
+def time_this(task_description):
+  print(task_description, '...', end=' ', flush=True)
   start_time = time.time()
-  best_moves = find_best_moves()
+  yield
   end_time = time.time()
-  print('Done in {} seconds'.format(end_time - start_time), flush=True)
+  print('Done in {:.2f} seconds'.format(end_time - start_time), flush=True)
+  
+
+def main():
+  with time_this('Computing best moves'):
+    best_moves = find_best_moves()
 
   player_o = PerfectPlayer(best_moves)
-  player_x = HumanPlayer()
 
+  with time_this('Training Q-Learner'):
+    q_score, observed_state_transition = train_q_learner(player_o, O)
+
+  player_x = build_q_learned_player(q_score, observed_state_transition)
+
+  num_games = 100
   stats = empty_stats()
-  for i in range(100):
-    print('Game #{}'.format(i))
-    match(player_x, player_o, stats)
+  for i in range(num_games):
+    print('Game #{} out of {}'.format(i, num_games))
+    match(player_x, player_o, stats, output=True)
   print(stats)
 
 
