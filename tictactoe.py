@@ -393,7 +393,7 @@ class QLearningPlayer(Player):
 
  
 # Returns q_score, observed_state_transition.
-def train_q_learner_against(opponent, as_x_or_o):
+def train_q_learner_against(opponent, as_player, num_episodes):
   q_score = empty_q_score()
   observed_state_transition = empty_observed_state_transition()
 
@@ -401,11 +401,10 @@ def train_q_learner_against(opponent, as_x_or_o):
       learning_rate=1, discount_factor=1, e_greedy=1)
 
   players = {
-    as_x_or_o: training_q_learner,
-    _opponent(as_x_or_o): opponent,
+    as_player: training_q_learner,
+    _opponent(as_player): opponent,
   }
 
-  num_episodes = 10000
   stats = empty_stats()
   for i in range(num_episodes):
     match(players[X], players[O], stats, output=False)
@@ -417,7 +416,7 @@ def train_q_learner_against(opponent, as_x_or_o):
 
 
 # Same as above but trains against itself.
-def train_q_learner_zero():
+def train_q_learner_zero(num_episodes):
   q_score = empty_q_score()
   observed_state_transition = empty_observed_state_transition()
 
@@ -427,7 +426,6 @@ def train_q_learner_zero():
   q_learner_o = QLearningPlayer(q_score, observed_state_transition,
       learning_rate=1, discount_factor=1, e_greedy=1)
 
-  num_episodes = 100000
   stats = empty_stats()
   for i in range(num_episodes):
     match(q_learner_x, q_learner_o, stats, output=False)
@@ -464,7 +462,8 @@ def main():
   player_x = PerfectPlayer(best_moves)
 
   with time_this('Training Q-Learner'):
-    q_score, observed_state_transition = train_q_learner_zero()
+    q_score, observed_state_transition = train_q_learner_against(
+        player_x, as_player=O, num_episodes=100000)
   player_o = build_q_learned_player(q_score, observed_state_transition)
 
   num_games = 1000
