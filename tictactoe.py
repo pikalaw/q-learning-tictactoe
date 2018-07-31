@@ -191,7 +191,7 @@ class Player(ABC):
     pass
 
 
-def match(player_x, player_o, stats, output=True):
+def match(player_x: Player, player_o: Player, stats, output=True):
   board = Board()
 
   players = {X: player_x, O: player_o}
