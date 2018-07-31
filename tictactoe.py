@@ -270,11 +270,14 @@ class HumanPlayer(Player):
     while True:
       print('{}!\n{}'.format(self.name, self.board))
       print('Valid moves are {}'.format(valid_moves))
-      move = int(input('Your move: '))
-      if move in valid_moves:
+      try: 
+        move_str = input('Your move as {}: '.format(_NAMES[self.me]))
+        move = int(move_str)
+        if move not in valid_moves:
+          raise 'ERROR: Invalid move!'
         return move
-      else:
-        print('ERROR: Invalid move!')
+      except Exception as error:
+        print('Invalid move {}: {}'.format(move_str, error))
 
   def end(self):
     winner = self.board.winner
@@ -390,7 +393,7 @@ class QLearningPlayer(Player):
 
  
 # Returns q_score, observed_state_transition.
-def train_q_learner(against_player, as_x_or_o):
+def train_q_learner_against(opponent, as_x_or_o):
   q_score = empty_q_score()
   observed_state_transition = empty_observed_state_transition()
 
@@ -398,11 +401,11 @@ def train_q_learner(against_player, as_x_or_o):
       learning_rate=1, discount_factor=1, e_greedy=1)
 
   players = {
-    as_x_or_o: against_player,
-    _opponent(as_x_or_o): training_q_learner
+    as_x_or_o: training_q_learner,
+    _opponent(as_x_or_o): opponent,
   }
 
-  num_episodes = 1000
+  num_episodes = 10000
   stats = empty_stats()
   for i in range(num_episodes):
     match(players[X], players[O], stats, output=False)
@@ -411,11 +414,35 @@ def train_q_learner(against_player, as_x_or_o):
   print(stats)
 
   return q_score, observed_state_transition
+
+
+# Same as above but trains against itself.
+def train_q_learner_zero():
+  q_score = empty_q_score()
+  observed_state_transition = empty_observed_state_transition()
+
+  q_learner_x = QLearningPlayer(q_score, observed_state_transition,
+      learning_rate=1, discount_factor=1, e_greedy=1)
+
+  q_learner_o = QLearningPlayer(q_score, observed_state_transition,
+      learning_rate=1, discount_factor=1, e_greedy=1)
+
+  num_episodes = 100000
+  stats = empty_stats()
+  for i in range(num_episodes):
+    match(q_learner_x, q_learner_o, stats, output=False)
+    # Linear decay of e-greedy.
+    new_e_greedy = (num_episodes - i) / num_episodes
+    q_learner_x.e_greedy = new_e_greedy
+    q_learner_o.e_greedy = new_e_greedy
+  print(stats)
+
+  return q_score, observed_state_transition
   
 
 def build_q_learned_player(q_score, observed_state_transition):
   return QLearningPlayer(q_score, observed_state_transition,
-      learning_rate=0, discount_factor=1, e_greedy=0)
+      learning_rate=1, discount_factor=1, e_greedy=0)
 
 
 def empty_stats():
@@ -433,21 +460,19 @@ def time_this(task_description):
 
 def main():
   with time_this('Computing best moves'):
-    best_moves = find_best_moves()
-
-  player_o = PerfectPlayer(best_moves)
+     best_moves = find_best_moves()
+  player_x = PerfectPlayer(best_moves)
 
   with time_this('Training Q-Learner'):
-    q_score, observed_state_transition = train_q_learner(player_o, O)
+    q_score, observed_state_transition = train_q_learner_zero()
+  player_o = build_q_learned_player(q_score, observed_state_transition)
 
-  player_x = build_q_learned_player(q_score, observed_state_transition)
-
-  num_games = 100
+  num_games = 1000
   stats = empty_stats()
   for i in range(num_games):
     print('Game #{} out of {}'.format(i, num_games))
     match(player_x, player_o, stats, output=True)
-  print(stats)
+    print(stats)
 
 
 if __name__ == '__main__':
